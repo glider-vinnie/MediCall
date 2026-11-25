@@ -1,0 +1,20 @@
+import { CalendarClock, CalendarDays, UserRound } from "lucide-react";
+import { useMemo, useState } from "react";
+
+import { Badge } from "../components/Badge";
+import { EmptyState } from "../components/EmptyState";
+import { formatDate, formatTime } from "../lib/format";
+import type { Appointment, Doctor, Slot } from "../types/api";
+import { PageHeader } from "./PageHeader";
+
+type ScheduleItem = { id: string; doctor: Doctor; appointment_date: string; start_time: string; end_time?: string; status: "available" | "booked" };
+
+export function AvailabilityPage({ doctors, slots, appointments }: { doctors: Doctor[]; slots: Slot[]; appointments: Appointment[] }) {
+  const [doctorId, setDoctorId] = useState("all"); const [selectedDate, setSelectedDate] = useState("");
+  const schedule = useMemo(() => {
+    const futureSlots: ScheduleItem[] = slots.map((slot) => ({ id: `slot-${slot.id}`, doctor: slot.doctor, appointment_date: slot.appointment_date, start_time: slot.start_time, end_time: slot.end_time, status: slot.status }));
+    const bookedFromAppointments: ScheduleItem[] = appointments.filter((appointment) => appointment.status === "booked").map((appointment) => ({ id: `appointment-${appointment.id}`, doctor: appointment.doctor, appointment_date: appointment.appointment_date, start_time: appointment.start_time, status: "booked" }));
+    return [...futureSlots, ...bookedFromAppointments].filter((slot) => (doctorId === "all" || slot.doctor.id === Number(doctorId)) && (!selectedDate || slot.appointment_date === selectedDate)).sort((a, b) => `${a.appointment_date}${a.start_time}`.localeCompare(`${b.appointment_date}${b.start_time}`));
+  }, [appointments, doctorId, selectedDate, slots]);
+  return <><PageHeader eyebrow="Schedule capacity" title="Availability" description="Open slots come from the availability API; booked entries are reflected from the appointment schedule." /><div className="mb-6 flex flex-col gap-3 sm:flex-row"><label className="flex h-11 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-slate-500"><UserRound size={17} /><select value={doctorId} onChange={(event) => setDoctorId(event.target.value)} className="w-full bg-transparent text-sm font-medium text-slate-700 outline-none"><option value="all">All doctors</option>{doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.name} · {doctor.specialty}</option>)}</select></label><label className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-slate-500"><CalendarDays size={17} /><input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="bg-transparent text-sm font-medium text-slate-700 outline-none" /></label></div>{schedule.length === 0 ? <EmptyState icon={CalendarClock} title="No slots match this view" detail="Try another clinician or date. New future availability is seeded by the backend." /> : <div className="grid gap-4 lg:grid-cols-2">{schedule.map((slot) => <article key={slot.id} className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_5px_16px_rgba(16,24,40,0.045)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_11px_24px_rgba(16,24,40,0.085)]"><span className={`grid size-11 shrink-0 place-items-center rounded-xl ${slot.status === "available" ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"}`}><CalendarClock size={19} /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-[#101828]">{slot.doctor.name}</p><p className="mt-1 text-xs text-slate-500">{slot.doctor.specialty} · {formatDate(slot.appointment_date)}</p></div><div className="text-right"><p className="text-sm font-semibold text-[#101828]">{formatTime(slot.start_time)}{slot.end_time ? ` – ${formatTime(slot.end_time)}` : ""}</p><div className="mt-1"><Badge tone={slot.status === "available" ? "green" : "slate"}>{slot.status === "available" ? "Available" : "Booked"}</Badge></div></div></article>)}</div>}</>;
+}

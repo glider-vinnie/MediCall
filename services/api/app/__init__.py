@@ -1,0 +1,1 @@
+"""MediCall AI backend package."""
